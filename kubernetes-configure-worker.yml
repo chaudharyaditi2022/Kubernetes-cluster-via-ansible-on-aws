@@ -1,0 +1,53 @@
+- hosts: tag_Name_K8s_worker_node
+  become: yes
+  become_user: root
+  vars_files:
+    - join.yml
+  tasks:
+    - name: "Configuring yum for kubeadm"
+      yum_repository:
+        name: "Kubernetes"
+        description: "Repo for Kubernetes kubeadm"
+        baseurl: 'https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch'
+        gpgcheck: yes
+        gpgkey: "https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
+        repo_gpgcheck: yes
+        enabled: yes
+        exclude: "kubelet kubeadm kubectl"
+
+    - name: "Installing kubeadm, kubectl & kubelet"
+      yum:
+        name: "{{ item }}"
+        state: present
+        disable_excludes: "Kubernetes"
+      loop:
+        - "kubeadm"
+        - "kubelet"
+        - "kubectl"
+        - "iproute-tc"
+
+    - name: "Enabling kubelet"
+      service:
+        name: "kubelet"
+        state: started
+        enabled: yes
+        args: "--now"
+
+    - name: "setting bridge-nf-call-iptables to 1"
+      shell: "echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables"
+      run_once: yes
+
+    - name: "Check if node has already joined the cluster"
+      stat:
+       path: "/etc/kubernetes/pki/ca.crt"
+      register: join_status
+
+
+
+    - name: "Joining Cluster"
+      command: "{{ token }} "
+      when: not join_status.stat.exists
+      run_once: yes
+
+
+

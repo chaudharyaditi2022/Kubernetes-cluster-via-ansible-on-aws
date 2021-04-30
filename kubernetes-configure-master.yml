@@ -1,0 +1,86 @@
+- hosts: tag_Name_K8s_master_node
+  become: yes
+  become_user: root
+  tasks:
+    - name: "Configuring yum for kubeadm"
+      yum_repository:
+        name: "Kubernetes"
+        description: "Repo for Kubernetes kubeadm"
+        baseurl: 'https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch'
+        gpgcheck: yes
+        gpgkey: "https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
+        repo_gpgcheck: yes
+        enabled: yes
+        exclude: "kubelet kubeadm kubectl"
+
+    - name: "Installing kubeadm, kubectl & kubelet"
+      yum:
+        name: "{{ item }}"
+        state: present
+        disable_excludes: "Kubernetes"
+      loop:
+        - "kubeadm"
+        - "kubelet"
+        - "kubectl"
+        - "iproute-tc"
+
+    - name: "Enabling kubelet"
+      service:
+        name: "kubelet"
+        state: started
+        enabled: yes
+        args: "--now"
+
+    - name: Check if kubeadm has already run
+      stat:
+       path: "/etc/kubernetes/pki/ca.key"
+      register: kubeadm_ca
+
+
+    - name: "setting bridge-nf-call-iptables to 1"
+      shell: "echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables"
+      run_once: yes
+      
+
+    - name: "Installing K8s internal programs images"
+      command: "kubeadm config images pull"
+      register: output
+
+    - name: "Initializing kubeadm"
+      command: "kubeadm init  --pod-network-cidr=10.243.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem --node-name=master"
+      when: not kubeadm_ca.stat.exists
+      run_once: yes
+
+    - name: "Creating $HOME/.kube directory"
+      file:
+        path: '$HOME/.kube'
+        state: "directory"
+
+    - name: 'Copying configuration file in $HOME/.kube folder'
+      copy:
+        remote_src: yes
+        src: "/etc/kubernetes/admin.conf"
+        dest: '$HOME/.kube/config'
+        owner: "root"
+        group: "root"
+
+    - name: "Network settings with flannel"
+      command: "kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"
+      run_once: yes
+
+    - name: "generating join command for worker nodes"
+      command: "kubeadm token create --print-join-command"
+      register: token
+
+    - name: "Saving join command in join.yml file"
+      copy: 
+        dest: "./join.yml"
+        content: "token : {{ token.stdout }}"
+      delegate_to: 127.0.0.1
+
+
+
+
+
+
+

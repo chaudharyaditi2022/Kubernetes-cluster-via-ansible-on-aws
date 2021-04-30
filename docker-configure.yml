@@ -1,0 +1,30 @@
+- hosts: tag_node_kubernetes
+  become: true
+  become_user: root
+  tasks:
+    - name: "Installing python3 and docker"
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - "python3"
+        - "docker"
+
+    - name: "Installing docker-py using pip3"
+      pip:
+        name: "docker-py"
+        executable: pip3
+
+    - name: "Configuring docker for systemd driver"
+      copy:
+        dest: "/etc/docker/daemon.json"
+        content: |
+           {
+            "exec-opts" : [ "native : cgroupdriver=systemd"]
+           }
+
+    - name: "Starting docker services"
+      service:
+        name: "docker"
+        state: started
+        enabled: yes

@@ -1,0 +1,79 @@
+- hosts: 127.0.0.1
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: "Installing python"
+      package:
+        name: "python3"
+        state: present
+
+
+    - name: "Installing boto3 library"
+      pip:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - boto
+        - boto3      
+
+    - name: "Creating default security group to allow all traffic"
+      amazon.aws.ec2_group:
+        name: "Kubernetes-default-sg"
+        description: Allows all ingress traffic
+        vpc_id: "{{ vpc_id }}"
+        region: "{{ region }}"
+        rules:
+        - proto: all
+          from_port: -1
+          to_port: -1
+          cidr_ip: 0.0.0.0/0
+          rule_desc: allow all traffic on all ports
+      when: sg_name == "Kubernetes-default-sg"
+
+    - name: create a new ec2 key pair, returns generated private key
+      amazon.aws.ec2_key:
+        name: "Kubernetes-cluster-key"
+      register: ec2_key
+      when: key_name == "Kubernetes-cluster-key" 
+
+    - name: "Storing private key in Kubernetes-cluster-key.pem"
+      copy: 
+        content: "{{ ec2_key.key.private_key }}"
+        dest: "Kubernetes-cluster-key.pem"
+        mode: 0600
+      when: 
+       - key_name == "Kubernetes-cluster-key" 
+       - ec2_key.changed == True
+
+
+    - name: "Launching EC2 instances - Master"
+      ec2:
+        region : "{{ region }}"
+        image : "{{ img_id }}"
+        vpc_subnet_id: "{{ vpc_subnet_id }}"
+        instance_type: "{{ instance_type }}"
+        group: "{{ sg_name }}"
+        key_name: "{{ key_name }}"
+        state: present
+        instance_tags:
+          Name: "K8s master node"
+          node : "kubernetes"
+
+    - name: "Launching EC2 instances - Worker"
+      ec2:
+        count : 2
+        region : "{{ region }}"
+        image : "{{ img_id }}"
+        vpc_subnet_id: "{{ vpc_subnet_id }}"
+        instance_type: "{{ instance_type }}"
+        group: "{{ sg_name }}"
+        key_name: "{{ key_name }}"
+        state: present
+        instance_tags:
+          Name: "K8s worker node"
+          node : "kubernetes"
+
+
+
+

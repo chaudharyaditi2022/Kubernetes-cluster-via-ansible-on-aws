@@ -1,0 +1,8 @@
+vpc_subnet_id: "subnet-3f1f1657"
+vpc_id: "vpc-c62ecead"
+region: "ap-south-1"
+instance_type: "t2.micro"
+sg_name: "Kubernetes-default-sg"
+key_name: "Kubernetes-cluster-key"
+img_id: "ami-0bcf5425cdc1d8a85"
+

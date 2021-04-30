@@ -1,0 +1,15 @@
+plugin: aws_ec2
+regions:
+  - ap-south-1
+# keyed_groups may be used to create custom groups
+strict: False
+keyed_groups:
+  # Add hosts to tag_Name_Value groups for each Name/Value tag pair
+  - prefix: tag
+    key: tags
+
+hostnames:
+  - ip-address
+  - dns-name
+  - tag:Name
+  - private-ip-address
